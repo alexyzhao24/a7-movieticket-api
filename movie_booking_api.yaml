@@ -1,0 +1,262 @@
+
+openapi: 3.0.3
+
+info:
+  title: Movie Ticket Booking API
+  version: 1.0.0
+  description: >
+    This API lets customers book movie tickets online.
+    Customers can create a booking for a selected showtime,
+    retrieve their booking information, and cancel a booking
+    before the cancellation deadline. The API checks seat
+    availability before confirming purchases and returns
+    appropriate errors for unavailable seats, invalid
+    requests, and unsuccessful payments.
+
+servers:
+  - url: https://api.example.com/cinema
+    description: Example movie theater server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /bookings:
+    post:
+      summary: Create a new movie ticket booking
+      description: >
+        Creates a booking for a selected movie showtime
+        and seats after successfully processing payment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+            example:
+              showtimeId: showtime123
+              seatIds:
+                - A5
+                - A6
+              paymentToken: payment_token_123
+
+      responses:
+        '201':
+          description: Booking successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+
+        '400':
+          description: Invalid booking information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+        '401':
+          description: Customer is not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+        '409':
+          description: Selected seats are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+        '422':
+          description: Payment could not be processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+
+  /bookings/{bookingId}:
+    get:
+      summary: Retrieve an existing movie ticket booking
+      description: >
+        Returns booking information, including the selected
+        showtime, seat numbers, payment total, and booking
+        confirmation.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          description: Unique identifier of the booking
+          schema:
+            type: string
+          example: booking123
+
+      responses:
+        '200':
+          description: Booking successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+
+        '401':
+          description: Customer is not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+        '404':
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+    delete:
+      summary: Cancel an existing movie ticket booking
+      description: >
+        Cancels a booking before the theater's cancellation
+        deadline. Bookings cannot be cancelled once the
+        cancellation period has expired. Any applicable
+        refund is handled separately.
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          description: Unique identifier of the booking to cancel
+          schema:
+            type: string
+          example: booking123
+
+      responses:
+        '204':
+          description: Booking successfully cancelled
+
+        '401':
+          description: Customer is not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+        '404':
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+        '409':
+          description: Cancellation deadline has passed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Authentication token for the customer
+
+  schemas:
+    CreateBookingRequest:
+      type: object
+      required:
+        - showtimeId
+        - seatIds
+        - paymentToken
+      properties:
+        showtimeId:
+          type: string
+          description: Identifier of the selected movie showtime
+          example: showtime123
+
+        seatIds:
+          type: array
+          description: Seats selected by the customer
+          minItems: 1
+          maxItems: 8
+          uniqueItems: true
+          items:
+            type: string
+          example:
+            - A5
+            - A6
+
+        paymentToken:
+          type: string
+          description: >
+            Secure payment token supplied by the payment
+            processor instead of raw credit card details.
+          example: payment_token_123
+
+    Booking:
+      type: object
+      required:
+        - bookingId
+        - showtimeId
+        - seatIds
+        - status
+        - totalCents
+        - currency
+      properties:
+        bookingId:
+          type: string
+          example: booking123
+
+        showtimeId:
+          type: string
+          example: showtime123
+
+        seatIds:
+          type: array
+          items:
+            type: string
+          example:
+            - A5
+            - A6
+
+        status:
+          type: string
+          enum:
+            - CONFIRMED
+            - CANCELLED
+          example: CONFIRMED
+
+        totalCents:
+          type: integer
+          minimum: 0
+          description: Total booking price in cents
+          example: 3000
+
+        currency:
+          type: string
+          example: USD
+
+        qrCodeUrl:
+          type: string
+          format: uri
+          description: URL for the electronic ticket QR code
+          example: https://example.com/tickets/booking
+
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: BOOKING_NOT_FOUND
+
+        message:
+          type: string
+          example: The requested booking could not be found.
+
+
